@@ -8,6 +8,9 @@ export PATH
 ARCH=$(uname -m)
 export PATH="$HOME/dotfiles/bin/scripts:$HOME/dotfiles/bin/$ARCH:$PATH"
 
+# Configuration for AI tools
+export AI_COMMIT_MODEL="gemini-3-flash-preview"
+
 # Python (pyenv)
 export PYENV_ROOT="$HOME/.pyenv"
 if command -v pyenv >/dev/null 2>&1; then
