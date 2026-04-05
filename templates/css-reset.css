@@ -1,0 +1,100 @@
+/* STRICT & LOW-SPECIFICITY RESET */
+
+/* 1. Box Sizing & Default Abstände killen */
+:where(*, *::before, *::after) {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    border-width: 0;
+    border-style: solid;
+    /* Min-Width 0 verhindert Flexbox/Grid Overflow Probleme */
+    min-width: 0;
+}
+
+/* 2. HTML & Body Setup */
+:where(body),
+:where(html) {
+    height: 100%;
+    overflow: hidden;
+    line-height: 1;
+    font-family: "dm-sans", sans-serif;
+    font-size: 100%;
+
+    /* Text-Skalierung auf Mobile fixen */
+    -webkit-text-size-adjust: 100%;
+
+    /* Text-Rendering optimieren */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+#app {
+    height: 100%;
+}
+
+/* 3. Medien (Bilder, Videos, SVG) */
+:where(img, picture, video, canvas, svg) {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    /* Verhindert Verzerrung, wenn height/width gesetzt sind */
+    object-fit: cover;
+}
+
+/* SVGs sollen Farbe vom Text erben, wenn nicht anders definiert */
+:where(svg) {
+    fill: currentColor;
+}
+
+:where(iframe) {
+    border: none;
+}
+
+/* 4. Typografie & Listen */
+:where(h1, h2, h3, h4, h5, h6, p, ul, ol, dl, figure, blockquote) {
+    /* Zeilenumbruch erzwingen, um horizontales Scrollen zu verhindern */
+    overflow-wrap: break-word;
+}
+
+:where(h1, h2, h3, h4, h5, h6) {
+    font-size: inherit;
+    font-weight: inherit;
+}
+
+:where(ul, ol) {
+    list-style: none;
+}
+
+/* Links sollen keine Dekoration haben */
+:where(a) {
+    text-decoration-skip-ink: none;
+    text-decoration: none;
+}
+
+/* 5. Formulare */
+:where(input, button, textarea, select, optgroup) {
+    font: inherit;
+    color: inherit;
+    letter-spacing: inherit;
+    background-color: transparent;
+    border: none;
+    appearance: none;
+    -webkit-appearance: none;
+}
+
+:where(textarea) {
+    white-space: pre-wrap;
+    overflow-wrap: break-word;
+}
+
+:where(button) {
+    cursor: pointer;
+    /* Touch-Highlight auf Mobile entfernen */
+    -webkit-tap-highlight-color: transparent;
+}
+
+:where(:focus-visible) {
+    outline: none;
+    outline-offset: 0;
+}
+

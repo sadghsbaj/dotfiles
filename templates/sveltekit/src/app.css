@@ -1,0 +1,10 @@
+@import "./lib/font-inter/font.css";
+
+body,
+html {
+    font-family: "Inter", sans-serif;
+    height: 100%;
+    scroll-behavior: smooth;
+    overscroll-behavior-y: none;
+    touch-action: manipulation;
+}

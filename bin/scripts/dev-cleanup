@@ -1,0 +1,268 @@
+#!/usr/bin/env bash
+
+ # Striktes Fehlerhandling
+
+set -euo pipefail
+
+# ==========================================
+# ⚙️ KONFIGURATION (Dynamisch nach Host)
+# ==========================================
+HOST_NAME=$(hostname)
+SAFE_FILE=".keep_cache"
+
+if [[ "$HOST_NAME" == "fedora" ]]; then
+    # --- SETUP FÜR DEN HAUPT-PC ---
+    BASE_DIR="$HOME/Main"
+    IGNORE_DIR="$BASE_DIR/01_programming/01_projects/01_current_projects"
+    
+    IMMEDIATE_DIRS=(
+        "$BASE_DIR/01_programming/01_projects/04_archived_projects"
+        "$BASE_DIR/01_programming/01_projects/06_backups"
+        "$BASE_DIR/01_programming/05_temporary"
+    )
+
+elif [[ "$HOST_NAME" == "raspiserver" ]]; then
+    # --- SETUP FÜR DEN RASPBERRY PI ---
+    BASE_DIR="$HOME/Projects"
+    
+    # Falls du auf dem Pi auch einen Ordner hast, der immer ignoriert werden soll:
+    IGNORE_DIR="$BASE_DIR/01_main" 
+    
+    IMMEDIATE_DIRS=(
+        "$BASE_DIR/05_archived"
+        "$BASE_DIR/07_random"
+    )
+
+else
+    # Fallback-Sicherheit
+    BASE_DIR="$HOME"
+    IGNORE_DIR="$HOME/current"
+    IMMEDIATE_DIRS=()
+fi
+
+# Namen der Cache- und Build-Ordner aller Sprachen
+TARGETS=(
+    "node_modules" 
+    ".venv" 
+    "venv" 
+    "__pycache__" 
+    "target" 
+    "zig-cache" 
+    "zig-out"
+)
+
+# ==========================================
+
+# 🛠️ HILFS-LOGIK (Such-Parameter bauen)
+
+# ==========================================
+
+NAME_ARGS=()
+
+for i in "${!TARGETS[@]}"; do
+
+    if [[ $i -eq 0 ]]; then
+
+        NAME_ARGS+=("-name" "${TARGETS[$i]}")
+
+    else
+
+        NAME_ARGS+=("-o" "-name" "${TARGETS[$i]}")
+
+    fi
+
+done
+
+
+# ==========================================
+
+# 🧹 FUNKTIONEN FÜR DAS LÖSCHEN
+
+# ==========================================
+
+
+# Für Phase 1: Sofortiges Löschen (nur auf Safe-File prüfen)
+
+process_immediate() {
+
+    local cache_dir="$1"
+
+    local project_dir
+
+    project_dir=$(dirname "$cache_dir")
+
+
+    if [[ -f "$project_dir/$SAFE_FILE" ]]; then
+
+        echo "🛡️ Geschützt: Überspringe $cache_dir"
+
+    else
+
+        echo "🗑️ Sofort-Löschung: $cache_dir"
+
+        rm -rf "$cache_dir"
+
+    fi
+
+}
+
+
+# Für Phase 2: Die smarte 14-Tage Logik
+
+process_14_days() {
+
+    local cache_dir="$1"
+
+    local project_dir
+
+    project_dir=$(dirname "$cache_dir")
+
+
+    # 1. Safe-File Check
+
+    if [[ -f "$project_dir/$SAFE_FILE" ]]; then
+
+        echo "🛡️ Geschützt: Überspringe $cache_dir"
+
+        return
+
+    fi
+
+
+    # 2. Activity Check
+
+    # - Wir schließen den cache_dir selbst UND den .git Ordner vom Scan aus (-prune)
+
+    # - Wir suchen nach Dateien/Ordnern, die jünger als 14 Tage sind (-mtime -14)
+
+    # - Wir brechen beim ersten Fund sofort ab (-quit)
+
+    local active_file
+
+    active_file=$(find "$project_dir" \
+
+        \( -path "$cache_dir" -o -path "$project_dir/.git" \) -prune \
+
+        -o -mtime -14 -print -quit)
+
+
+    if [[ -z "$active_file" ]]; then
+
+        echo "🗑️ Inaktiv (>14 Tage): Lösche $cache_dir"
+
+        rm -rf "$cache_dir"
+
+    else
+
+        echo "⏳ Aktiv: Überspringe $cache_dir"
+
+    fi
+
+}
+
+
+echo "🚀 Starte Dev-Cleanup..."
+
+
+# ==========================================
+
+# 🧹 PHASE 1: SOFORTIGE LÖSCHUNG
+
+# ==========================================
+
+echo "---"
+
+echo "Phase 1: Bereinige Archiv, Backups und Temporäres..."
+
+for dir in "${IMMEDIATE_DIRS[@]}"; do
+
+    if [[ -d "$dir" ]]; then
+
+        find "$dir" -type d \( "${NAME_ARGS[@]}" \) -prune -print0 | while IFS= read -r -d '' cache_dir; do
+
+            process_immediate "$cache_dir"
+
+        done
+
+    fi
+
+done
+
+
+# ==========================================
+
+# ⏳ PHASE 2: 14-TAGE REGEL
+
+# ==========================================
+
+echo "---"
+
+echo "Phase 2: Prüfe restliche Projekte auf Inaktivität..."
+
+
+# Ausschluss-Liste bauen (Current-Ordner + die bereits verarbeiteten Immediate-Ordner ignorieren)
+
+PRUNE_PATHS=("-path" "$IGNORE_DIR")
+
+for dir in "${IMMEDIATE_DIRS[@]}"; do
+
+    PRUNE_PATHS+=("-o" "-path" "$dir")
+
+done
+
+
+# Suche im gesamten Main-Ordner nach den Targets
+
+find "$BASE_DIR" \
+
+    \( "${PRUNE_PATHS[@]}" \) -prune \
+
+    -o -type d \( "${NAME_ARGS[@]}" \) -prune -print0 | while IFS= read -r -d '' cache_dir; do
+
+    process_14_days "$cache_dir"
+
+done
+
+
+# ==========================================
+
+# 📦 PHASE 3: GLOBAL CACHE CLEANUP
+
+# ==========================================
+
+echo "---"
+
+echo "Phase 3: Leere globale Caches (pnpm & bun)..."
+
+
+if command -v pnpm &> /dev/null; then
+
+    echo "Führe 'pnpm store prune' aus..."
+
+    pnpm store prune
+
+else
+
+    echo "pnpm nicht gefunden. Überspringe..."
+
+fi
+
+
+if command -v bun &> /dev/null; then
+
+    echo "Führe 'bun pm cache rm' aus..."
+
+    # Wir wechseln kurz das Verzeichnis, damit Bun nicht im Home-Verzeichnis rumnervt
+
+    (cd /tmp && bun pm cache rm)
+
+else
+
+    echo "bun nicht gefunden. Überspringe..."
+
+fi
+
+
+echo "---"
+
+echo "✅ Cleanup erfolgreich abgeschlossen!" 

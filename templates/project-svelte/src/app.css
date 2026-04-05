@@ -1,0 +1,5 @@
+@import "./assets/font-inter/font.css";
+
+body {
+	font-family: "Inter", sans-serif;
+}
